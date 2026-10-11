@@ -4,7 +4,7 @@ Subject: [PATCH] mac80211: tune ath11k RX rings for 512M NSS profile
 Add a late NSS ath11k backports patch, after the existing memory-profile
 and RX-buffer-length patches. Limit changes to the 512M profile.
 ---
- package/kernel/mac80211/patches/nss/ath11k/999-950-ath11k-shrink-remaining-512m-rx-rings.patch | 29 + 29
+ package/kernel/mac80211/patches/nss/ath11k/999-950-ath11k-shrink-remaining-512m-rx-rings.patch | 29 +++++++++++++++++++++++++++++
  1 file changed, 29 insertions(+)
 
 diff --git a/package/kernel/mac80211/patches/nss/ath11k/999-950-ath11k-shrink-remaining-512m-rx-rings.patch b/package/kernel/mac80211/patches/nss/ath11k/999-950-ath11k-shrink-remaining-512m-rx-rings.patch
