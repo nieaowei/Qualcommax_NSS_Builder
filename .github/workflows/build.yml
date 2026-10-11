@@ -313,10 +313,10 @@ jobs:
           set -euo pipefail
           if [[ "$BUILD_RESULT" != "success" ]]; then
             # A half-built release would silently be missing devices, and a
-            # draft left behind is never pruned. Drop both and fail. No
+            # draft left behind is never pruned. Drop it and fail. No
             # --cleanup-tag: a draft's tag exists only inside the release.
             gh release delete "$TAG" --repo "$GITHUB_REPOSITORY" --yes
-            echo "::error::a build group failed ($BUILD_RESULT); draft releases discarded"
+            echo "::error::MX4200 v1 build failed ($BUILD_RESULT); draft release discarded"
             exit 1
           fi
           gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --draft=false --latest
