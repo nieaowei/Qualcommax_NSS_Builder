@@ -1,7 +1,8 @@
 # ath11k NSS RX memory tuning (512 MB IPQ807x)
 
-This experimental change targets the `ipq807x-512m` build group (including
-Linksys MX4200 v1). The builder preserves the existing
+This experimental change targets only Linksys MX4200 v1 in the `ipq807x-512m`
+build group. The CI matrix now produces only the default NSS image (no mesh
+flavour) and checks that exactly one matching sysupgrade image is uploaded. The builder preserves the existing
 `CONFIG_ATH11K_MEM_PROFILE_512M=y` and
 `CONFIG_NSS_MEM_PROFILE_MEDIUM=y` settings and NSS Wi-Fi offload.
 
