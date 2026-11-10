@@ -1,7 +1,7 @@
 #
 # Linksys MX4200 v1 only: 512 MiB RAM, 6 MiB kernel partition.
-# Keep REGULAR stack protection. Detached vmlinux-btf avoids adding
-# debug information to the FIT kernel image.
+# Keep REGULAR stack protection, enable native kernel BTF for CO-RE.
+# The compressed FIT kernel must still fit into the 6 MiB partition.
 #
 CONFIG_TARGET_qualcommax_ipq807x=y
 CONFIG_TARGET_MULTI_PROFILE=y
@@ -14,5 +14,7 @@ CONFIG_TARGET_DEVICE_qualcommax_ipq807x_DEVICE_linksys_mx4200v1=y
 CONFIG_PACKAGE_zram-swap=m
 CONFIG_TARGET_DEVICE_PACKAGES_qualcommax_ipq807x_DEVICE_linksys_mx4200v1="zram-swap"
 
-# Third-party detached BTF support for CO-RE loaders.
-CONFIG_PACKAGE_vmlinux-btf=y
+# Native BTF from the actual kernel build (not synthetic detached BTF).
+CONFIG_KERNEL_DEBUG_INFO=y
+CONFIG_KERNEL_DEBUG_INFO_REDUCED=n
+CONFIG_KERNEL_DEBUG_INFO_BTF=y

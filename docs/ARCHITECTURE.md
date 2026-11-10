@@ -63,7 +63,8 @@ backup, which otherwise holds only the ones apk recorded a checksum for.
   802.11s mesh.
 - **Single target.** MX4200 v1 uses a 6 MiB kernel partition and
   REGULAR stack protection. Its ath11k RX ring patch applies only in
-  the active build. Detached BTF avoids expanding the FIT kernel.
+  the active build. Native kernel BTF is verified after compilation;
+  the FIT kernel must fit within 6 MiB before image publishing.
 
 - **Reproducible inputs.** `SOURCE_DATE_EPOCH` is the commit time of the
   checked-out source, with `TZ=UTC`, `LC_ALL=C` and fixed kbuild user and

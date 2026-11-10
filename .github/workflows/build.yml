@@ -44,7 +44,8 @@ jobs:
         Linksys MX4200 v1 (512 MiB RAM) only. Use the matching
         linksys_mx4200v1 sysupgrade image on existing OpenWrt.
         Do not flash this image onto MX4200 v2, MX5300 or MX8500.
-        Includes RX ring memory optimization and detached vmlinux-btf.
+        Includes RX ring memory optimization and native kernel BTF.
+        The FIT kernel must fit the 6 MiB partition or the build fails.
 
         Wired offload runs in the PPE through the fw4 flowtable, switchdev
         and tc. The NSS Wi-Fi offload is on by default; turn it off with

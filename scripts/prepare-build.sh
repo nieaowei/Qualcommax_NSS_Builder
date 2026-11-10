@@ -119,17 +119,8 @@ fi
 install -m 0644 "$rx_patch" "$rx_target"
 log::info "Installed low-memory ath11k RX ring patch"
 
-# Detached vmlinux-btf avoids increasing the 6 MiB FIT kernel image.
-# Pin this third-party package to an audited revision for reproducibility.
-BTF_SHA=b41770520cef00652738cdfbbdda44d4de77f3f5
-if [[ ! -d package/vmlinux-btf/.git ]]; then
-  [[ ! -e package/vmlinux-btf ]] ||
-    log::die "package/vmlinux-btf exists but is not a git checkout"
-  git clone -q https://github.com/QiuSimons/vmlinux-btf.git package/vmlinux-btf
-fi
-git -C package/vmlinux-btf checkout -q --detach "$BTF_SHA" ||
-  log::die "cannot check out pinned vmlinux-btf source"
-log::info "Installed vmlinux-btf at $BTF_SHA"
+# Native BTF is enabled by the MX4200 v1 Kconfig fragment below.
+# Never clone the detached vmlinux-btf package in this branch.
 
 # 2. Assemble .config from the common + device configs, then resolve.
 log::info "Assembling .config from ${CONFIGS[*]#"$BUILDER_REPO"/}"

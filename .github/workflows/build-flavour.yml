@@ -324,6 +324,185 @@ jobs:
           make -j"$(nproc)" IGNORE_ERRORS=m || make -j1 V=s IGNORE_ERRORS=m
           staging_dir/host/bin/ccache -s
 
+      - name: Verify native BTF and 6 MiB FIT kernel limit
+        working-directory: openwrt
+        run: |
+          set -euo pipefail
+          # Ensure the real kernel (not just OpenWrt's top-level .config)
+          # has BTF enabled and that vmlinux contains its .BTF section.
+          mapfile -t kconfigs < <(find build_dir -type f -path '*/linux-qualcommax_ipq807x/linux-*/.config')
+          [[ ${#kconfigs[@]} -eq 1 ]] || {
+            echo "::error::expected one configured ipq807x Linux tree, found ${#kconfigs[@]}"
+            exit 1
+          }
+          grep -qx 'CONFIG_DEBUG_INFO_BTF=y' "${kconfigs[0]}" || {
+            echo "::error::native Linux CONFIG_DEBUG_INFO_BTF is not enabled"
+            exit 1
+          }
+          vmlinux="${kconfigs[0]%/.config}/vmlinux"
+          [[ -s "$vmlinux" ]] || { echo "::error::unstripped vmlinux is missing"; exit 1; }
+          readelf -S "$vmlinux" | grep -qE '[[:space:]]\.BTF[[:space:]]' || {
+            echo "::error::vmlinux has no .BTF section"
+            exit 1
+          }
+
+          # The sysupgrade tar contains the actual flashable FIT kernel.
+          mapfile -t images < <(find bin/targets/qualcommax/ipq807x -maxdepth 1             -type f -name '*linksys_mx4200v1*squashfs-sysupgrade.bin')
+          [[ ${#images[@]} -eq 1 ]] || {
+            echo "::error::expected exactly one MX4200 v1 sysupgrade image"
+            exit 1
+          }
+          mapfile -t kernel_entries < <(tar -tf "${images[0]}" | grep -E '^sysupgrade-[^/]+/kernel        run: |
+          set -euo pipefail
+          out=$(dirname "$(find openwrt/bin/targets -name sha256sums)")
+
+          # Sysupgrade images only - no factory/initramfs, per the project's
+          # sysupgrade-from-existing-OpenWrt model. Image names carry the
+          # device, so the groups never collide in the release. The build
+          # metadata does, so it is uploaded under the group name instead of
+          # dropped - it is the answer to "what exactly was in this image".
+          mapfile -t assets < <(find "$out" -maxdepth 1 -type f -name 'openwrt-*-squashfs-sysupgrade.bin')
+          [[ ${#assets[@]} -eq 1 ]] || { echo "::error::expected one MX4200 v1 sysupgrade image"; exit 1; }
+          [[ "${assets[0]}" == *"linksys_mx4200v1"* ]] || { echo "::error::unexpected sysupgrade image: ${assets[0]}"; exit 1; }
+          grep 'sysupgrade.bin' "$out/sha256sums" >"sha256sums-${DEVICE}.txt"
+          cp "$out/config.buildinfo" "config-${DEVICE}.buildinfo"
+          # The ImageBuilder and the overlay files are what custom.yml builds
+          # a picked package set from.
+          ib=$(find "$out" -maxdepth 1 -name 'openwrt-imagebuilder-*.tar.zst')
+          [[ -f "$ib" ]] || { echo "::error::no ImageBuilder in $out"; exit 1; }
+          mv "$ib" "imagebuilder-${DEVICE}.tar.zst"
+          tar -C openwrt/files -czf "files-${DEVICE}.tar.gz" .
+          assets+=("imagebuilder-${DEVICE}.tar.zst" "files-${DEVICE}.tar.gz")
+
+          # --clobber, so re-running a job that died mid-upload is a recovery
+          # and not a permanent "asset already exists".
+          for attempt in 1 2 3; do
+            gh release upload "$TAG" \
+              --repo "$GITHUB_REPOSITORY" --clobber \
+              "${assets[@]}" "sha256sums-${DEVICE}.txt" "config-${DEVICE}.buildinfo" && break
+            [[ $attempt -lt 3 ]] || { echo "::error::upload failed after $attempt attempts"; exit 1; }
+            echo "::warning::upload attempt $attempt failed; retrying"
+            sleep 15
+          done
+
+          {
+            echo "## ${DEVICE}"
+            echo "- assets: ${#assets[@]}"
+          } >>"$GITHUB_STEP_SUMMARY"
+
+      # The target packages (kernel, every kmod) and their signed index, at
+      # the path the image's uci-defaults points to. The feed job publishes it.
+      - name: Stage kmod feed
+        run: |
+          set -euo pipefail
+          pkgs="$(dirname "$(find openwrt/bin/targets -name sha256sums)")/packages"
+          [[ -s "$pkgs/packages.adb" ]] || { echo "::error::no packages.adb in $pkgs"; exit 1; }
+          mkdir -p "feed/$TAG"
+          mv "$pkgs" "feed/$TAG/$DEVICE"
+          out=$(dirname "$pkgs")
+          cp "$out/profiles.json" "$out"/*.manifest "feed/$TAG/$DEVICE/"
+          echo "- feed: $(find "feed/$TAG/$DEVICE" -name '*.apk' | wc -l) packages, $(du -sh "feed/$TAG/$DEVICE" | cut -f1)" >>"$GITHUB_STEP_SUMMARY"
+
+      - name: Upload kmod feed
+        uses: actions/upload-artifact@v7
+        with:
+          name: feed-${{ inputs.release_prefix }}-${{ matrix.device }}
+          path: feed
+          retention-days: 3
+          compression-level: 0
+
+  publish:
+    name: Publish release
+    needs: [release, build]
+    if: always() && needs.release.result == 'success'
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ needs.release.outputs.tag }}
+      BUILD_RESULT: ${{ needs.build.result }}
+    steps:
+      - name: Publish or discard
+        run: |
+          set -euo pipefail
+          if [[ "$BUILD_RESULT" != "success" ]]; then
+            # A half-built release would silently be missing devices, and a
+            # draft left behind is never pruned. Drop it and fail. No
+            # --cleanup-tag: a draft's tag exists only inside the release.
+            gh release delete "$TAG" --repo "$GITHUB_REPOSITORY" --yes
+            echo "::error::a build group failed ($BUILD_RESULT); draft release discarded"
+            exit 1
+          fi
+          gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --draft=false --latest
+
+  prune:
+    name: Prune old releases
+    needs: publish
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Prune
+        run: |
+          set -euo pipefail
+          PREFIX="$RELEASE_PREFIX" bash scripts/prune-releases.sh
+
+  feed:
+    name: Publish kmod feeds and the image picker
+    needs: [release, prune]
+    runs-on: ubuntu-26.04
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: feed-${{ inputs.release_prefix }}-*
+          merge-multiple: true
+          path: new
+
+      # gh-pages holds the picker and one directory per release tag, which
+      # lives as long as the release. One orphan commit, so pruned feeds leave
+      # the repository too.
+      - name: Push to gh-pages
+        env:
+          REPO: ${{ github.repository }}
+          PREFIXES: ${{ env.PREFIXES }}
+          NEW_DIR: new
+          PAGES_DEPLOY_KEY: ${{ secrets.PAGES_DEPLOY_KEY }}
+        run: bash scripts/publish-site.sh
+)
+          [[ ${#kernel_entries[@]} -eq 1 ]] || {
+            echo "::error::could not uniquely identify the FIT kernel in sysupgrade"
+            exit 1
+          }
+          kernel_bytes=$(tar -xOf "${images[0]}" "${kernel_entries[0]}" | wc -c)
+          max_bytes=$((6 * 1024 * 1024))
+          echo "MX4200 v1 FIT kernel: $kernel_bytes / $max_bytes bytes"
+          {
+            echo "### MX4200 v1 native BTF"
+            echo "- Kernel BTF: enabled (.BTF verified in vmlinux)"
+            echo "- FIT kernel: $kernel_bytes / $max_bytes bytes"
+          } >>"$GITHUB_STEP_SUMMARY"
+          (( kernel_bytes <= max_bytes )) || {
+            echo "::error::FIT kernel exceeds MX4200 v1 6 MiB partition"
+            exit 1
+          }
+
       - name: Upload images
         run: |
           set -euo pipefail

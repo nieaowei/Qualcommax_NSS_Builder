@@ -34,8 +34,8 @@ bundled whole: only the packages selected in the config are built.
 The `Build` workflow in this fork selects only the
 `ipq807x-6m-kernel` group; its config selects only MX4200 v1.
 Other inherited device configurations are not built. This group keeps
-REGULAR stack protection for its 6 MiB kernel partition and installs
-detached `vmlinux-btf`, not embedded kernel BTF.
+REGULAR stack protection for its 6 MiB kernel partition and enables
+native kernel BTF. The build checks the generated FIT kernel size.
 
 To add a board, add one line to the config of its group:
 
@@ -103,8 +103,10 @@ changed. `etc/rc.local` runs on every boot.
 The MX4200 v1 ath11k patch is placed in
 `patches/mac80211/nss-wifi/` by this builder and installed by
 `prepare-build.sh` into the upstream NSS Wi-Fi backports patch series.
-The same script installs a pinned copy of `QiuSimons/vmlinux-btf`.
-Install host `dwarves` / `pahole` for local builds.
+Native BTF is configured by the MX4200 v1 device fragment;
+no detached BTF package is cloned. Install host `dwarves` / `pahole`
+for local builds. The CI verifies that vmlinux has .BTF and that the
+flashable FIT kernel fits within 6 MiB.
 
 ## Schedule and triggers
 

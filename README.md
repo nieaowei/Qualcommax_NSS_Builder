@@ -13,14 +13,15 @@ PPE-based wired offload.
 - **Low-memory ath11k:** `DP_RXDMA_BUF_RING_SIZE` and
   `DP_RXDMA_MONITOR_DESC_RING_SIZE` shrink from 4096 to 2048. The refill
   buffer length and NSS offload paths remain unchanged.
-- **Detached BTF:** pins
-  [QiuSimons/vmlinux-btf](https://github.com/QiuSimons/vmlinux-btf)
-  to `b41770520cef00652738cdfbbdda44d4de77f3f5`, installs it as
-  `CONFIG_PACKAGE_vmlinux-btf=y`, and provides `pahole` via the Ubuntu
-  `dwarves` build dependency.
-- **6 MiB kernel partition:** keeps REGULAR stack protection.
-  `CONFIG_KERNEL_DEBUG_INFO_BTF` is **not enabled** to avoid enlarging the
-  compressed FIT kernel image.
+- **Native kernel BTF:** enables `CONFIG_KERNEL_DEBUG_INFO=y`,
+  disables reduced debug information, and enables
+  `CONFIG_KERNEL_DEBUG_INFO_BTF=y` (OpenWrt config fragment).
+  The build installs `dwarves` / `pahole` on the host.
+  It does **not** install a separate `vmlinux-btf` package.
+- **6 MiB kernel partition:** keeps REGULAR stack protection and checks
+  both the actual Linux kernel's `CONFIG_DEBUG_INFO_BTF=y`, the
+  `.BTF` section in `vmlinux`, and the FIT kernel size extracted from
+  the sysupgrade archive against the 6 MiB limit.
 
 ## Build
 
@@ -39,13 +40,14 @@ MX5300, MX8500, or MX4300.** Confirm the compressed kernel fits the
 
 ```sh
 grep -E 'MemAvailable|Slab|SUnreclaim' /proc/meminfo
-ls -l /usr/lib/debug/boot/vmlinux*
+ls -lh /sys/kernel/btf/vmlinux
 dmesg | grep -Ei 'ath11k|nss|oom|allocation'
 ```
 
-The detached BTF package generates type data from headers/config, not the
-running kernel's full embedded BTF; `/sys/kernel/btf/vmlinux` may still
-be absent. Test compatibility with the exact eBPF CO-RE application you use.
+The BTF section is generated from the kernel's actual debug information.
+After flashing a successful build, check `/sys/kernel/btf/vmlinux` and
+test the exact eBPF CO-RE application. Before flashing, verify the
+build check passed: a too-large kernel must not be used.
 
 The ppe-nss tree does not expose
 `CPTCFG_ATH11K_MEM_PROFILE_512M`. Consequently, the supplied
