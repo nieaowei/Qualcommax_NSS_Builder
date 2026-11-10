@@ -31,18 +31,11 @@ bundled whole: only the packages selected in the config are built.
 
 ## Groups
 
-The `build` job builds every group:
-
-```yaml
-    strategy:
-      matrix:
-        device: [xiaomi_ax3600, ipq807x-1g, ipq807x-512m, ipq807x-256m, ipq807x-6m-kernel, ipq60xx-1g, ipq60xx-512m]
-```
-
-A group is one `devices/<group>/` directory. Boards share a group when they
-share a subtarget and a RAM size, because the ath11k memory profile is
-fixed at build time for the whole image. The subtarget is set in each
-group's config, so IPQ807x and IPQ60xx groups build side by side.
+The `Build` workflow in this fork selects only the
+`ipq807x-6m-kernel` group; its config selects only MX4200 v1.
+Other inherited device configurations are not built. This group keeps
+REGULAR stack protection for its 6 MiB kernel partition and installs
+detached `vmlinux-btf`, not embedded kernel BTF.
 
 To add a board, add one line to the config of its group:
 
@@ -65,7 +58,7 @@ To change the config, edit it in a real checkout and diff it back:
 
 ```sh
 git clone --branch ppe-nss https://github.com/JuliusBairaktaris/openwrt-ppe-nss openwrt
-cat devices/common/config devices/xiaomi_ax3600/config > openwrt/.config
+cat devices/common/config devices/ipq807x-6m-kernel/config > openwrt/.config
 cd openwrt && make menuconfig
 ./scripts/diffconfig.sh > /tmp/delta.config
 ```
@@ -106,6 +99,12 @@ changed. `etc/rc.local` runs on every boot.
 - `patches/tree/<variant>/*.patch` apply to the OpenWrt tree. They carry
   fixes not yet in the branch being built. A patch that is already applied
   is skipped; one that does not apply fails the build.
+
+The MX4200 v1 ath11k patch is placed in
+`patches/mac80211/nss-wifi/` by this builder and installed by
+`prepare-build.sh` into the upstream NSS Wi-Fi backports patch series.
+The same script installs a pinned copy of `QiuSimons/vmlinux-btf`.
+Install host `dwarves` / `pahole` for local builds.
 
 ## Schedule and triggers
 

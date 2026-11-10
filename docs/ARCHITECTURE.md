@@ -4,7 +4,7 @@
 
 | Workflow | Builds | Release |
 |---|---|---|
-| `build.yml` | `ppe-nss` of openwrt-ppe-nss, six groups | `ppe-nss-*`, a new one per build |
+| `build.yml` | `ppe-nss` for MX4200 v1 only | `ppe-nss-*`, a new one per build |
 | `lint.yml` | nothing | runs `actionlint`, `shellcheck` and `yamllint` on workflow and script changes |
 | `custom.yml` | one image per `[build]` issue, from a release's ImageBuilder | `custom-<issue>-<run>` prerelease, deleted after seven days |
 | `pages.yml` | nothing | republishes the image picker on `gh-pages` |
@@ -61,9 +61,10 @@ backup, which otherwise holds only the ones apk recorded a checksum for.
 - **Both firmware lines in one image.** The images carry NSS firmware 12.5
   and 11.4 and boot 12.5; `nss-wifi.general.firmware` picks 11.4 for
   802.11s mesh.
-- **Groups by RAM.** The ath11k memory profile is fixed at build time for
-  the whole image, so boards can only share a build when they share a RAM
-  size.
+- **Single target.** MX4200 v1 uses a 6 MiB kernel partition and
+  REGULAR stack protection. Its ath11k RX ring patch applies only in
+  the active build. Detached BTF avoids expanding the FIT kernel.
+
 - **Reproducible inputs.** `SOURCE_DATE_EPOCH` is the commit time of the
   checked-out source, with `TZ=UTC`, `LC_ALL=C` and fixed kbuild user and
   host. The images follow the branch tip, so each build pins a commit but

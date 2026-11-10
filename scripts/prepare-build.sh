@@ -104,6 +104,33 @@ for p in "$BUILDER_REPO/patches/tree/$VARIANT"/*.patch; do
 done
 shopt -u nullglob
 
+# ppe-nss has no ATH11K_MEM_PROFILE_512M symbol. Our single-board build
+# uses the 2048-entry sizes directly; the nss-wifi patch series runs
+# after the normal ath11k backports patches.
+[[ "$DEVICE" == "ipq807x-6m-kernel" && "$VARIANT" == "ppe-nss" ]] ||
+  log::die "this fork only supports ppe-nss / MX4200 v1"
+rx_patch="$BUILDER_REPO/patches/mac80211/nss-wifi/999-950-ath11k-shrink-mx4200v1-rx-rings.patch"
+rx_target="package/kernel/mac80211/patches/nss-wifi/$(basename "$rx_patch")"
+[[ -f "$rx_patch" && -d "$(dirname "$rx_target")" ]] ||
+  log::die "ath11k patch or upstream nss-wifi patch directory is missing"
+if [[ -e "$rx_target" ]] && ! cmp -s "$rx_patch" "$rx_target"; then
+  log::die "upstream contains a conflicting RX ring patch: $rx_target"
+fi
+install -m 0644 "$rx_patch" "$rx_target"
+log::info "Installed low-memory ath11k RX ring patch"
+
+# Detached vmlinux-btf avoids increasing the 6 MiB FIT kernel image.
+# Pin this third-party package to an audited revision for reproducibility.
+BTF_SHA=b41770520cef00652738cdfbbdda44d4de77f3f5
+if [[ ! -d package/vmlinux-btf/.git ]]; then
+  [[ ! -e package/vmlinux-btf ]] ||
+    log::die "package/vmlinux-btf exists but is not a git checkout"
+  git clone -q https://github.com/QiuSimons/vmlinux-btf.git package/vmlinux-btf
+fi
+git -C package/vmlinux-btf checkout -q --detach "$BTF_SHA" ||
+  log::die "cannot check out pinned vmlinux-btf source"
+log::info "Installed vmlinux-btf at $BTF_SHA"
+
 # 2. Assemble .config from the common + device configs, then resolve.
 log::info "Assembling .config from ${CONFIGS[*]#"$BUILDER_REPO"/}"
 cat "${CONFIGS[@]}" >.config

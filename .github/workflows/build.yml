@@ -1,8 +1,7 @@
 name: Build
 
-# The ppe-nss images: OpenWrt from the ppe-nss branch with the vendor NSS Wi-Fi offload, for
-# every ipq807x and ipq60xx device group (build-flavour.yml does the work). The vendor NSS
-# stack (edma-nss releases) was last built from the archive/edma-nss-final tag of this repo.
+# MX4200 v1-only (512 MiB RAM, 6 MiB kernel partition).
+# Keep upstream ppe-nss with NSS Wi-Fi offload.
 on:
   workflow_dispatch:
   # Only what goes into an image: the site, prune and stats scripts do not.
@@ -33,20 +32,19 @@ jobs:
       nss_ref: ppe-nss
       variant: ppe-nss
       release_prefix: ppe-nss
-      title: OpenWrt ppe-nss
-      # The ath11k memory profile is compile-time and image-wide, so boards share a build
-      # only when they share a profile.
-      devices: '["xiaomi_ax3600", "ipq807x-1g", "ipq807x-512m", "ipq807x-256m", "ipq807x-6m-kernel", "ipq60xx-1g", "ipq60xx-512m"]'
+      title: OpenWrt PPE NSS - MX4200 v1
+      # This group now contains only the MX4200 v1 device profile.
+      devices: '["ipq807x-6m-kernel"]'
       # nss-firmware, and the luci fork carrying luci-app-qca-ppe-qos (openwrt/luci PR 8965),
       # which prepare-build.sh swaps in for the default luci feed.
       feeds: |
         src-git nss https://github.com/JuliusBairaktaris/nss-packages.git;ppe-nss
         src-git luci https://github.com/JuliusBairaktaris/luci.git;luci-app-ppe-qos
       notes: |
-        Pick the `...-<your device>-squashfs-sysupgrade.bin` asset and flash
-        it over an existing OpenWrt install. These are sysupgrade images only -
-        there is no factory image; install stock OpenWrt first if you are not
-        already running it.
+        Linksys MX4200 v1 (512 MiB RAM) only. Use the matching
+        linksys_mx4200v1 sysupgrade image on existing OpenWrt.
+        Do not flash this image onto MX4200 v2, MX5300 or MX8500.
+        Includes RX ring memory optimization and detached vmlinux-btf.
 
         Wired offload runs in the PPE through the fw4 flowtable, switchdev
         and tc. The NSS Wi-Fi offload is on by default; turn it off with
