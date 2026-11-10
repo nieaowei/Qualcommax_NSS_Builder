@@ -1,6 +1,6 @@
 name: Build flavour
 
-# One image flavour for every ipq807x and ipq60xx device group:
+# One image flavour for Linksys MX4200 v1 (qualcommax/ipq807x):
 #   check (upstream moved?) -> draft release -> build each group -> publish -> prune -> feed
 # Called by build.yml (ppe-nss, the vendor NSS Wi-Fi offload); everything that tells the
 # flavours apart is an input, and the devices/<group>/config files.
@@ -121,7 +121,7 @@ jobs:
               echo "## OpenWrt Build — ${name}"
               echo "- **Date**: $date"
               echo "- **Variant**: \`${name}\`"
-              echo "- **Targets**: \`qualcommax/ipq807x\`, \`qualcommax/ipq60xx\`"
+              echo "- **Target**: linksys_mx4200v1 (qualcommax/ipq807x)"
               echo "- **Upstream**: \`${UPSTREAM_REPO}@${UPSTREAM_SHA}\`"
               if [[ -n "${NSS_SHA}" ]]; then
                 echo "- **NSS**: \`${NSS_SHA}\`"
@@ -178,7 +178,7 @@ jobs:
           # step that has to succeed.
           sudo apt-get update || true
           sudo apt-get install -y \
-            bzip2 g++ gawk gcc git glibc-source libncurses-dev make rsync
+            bzip2 dwarves g++ gawk gcc git glibc-source libncurses-dev make rsync
 
       - name: Checkout OpenWrt source
         uses: actions/checkout@v7
@@ -335,7 +335,8 @@ jobs:
           # metadata does, so it is uploaded under the group name instead of
           # dropped - it is the answer to "what exactly was in this image".
           mapfile -t assets < <(find "$out" -maxdepth 1 -type f -name 'openwrt-*-squashfs-sysupgrade.bin')
-          [[ ${#assets[@]} -gt 0 ]] || { echo "::error::no sysupgrade images in $out"; exit 1; }
+          [[ ${#assets[@]} -eq 1 ]] || { echo "::error::expected one MX4200 v1 sysupgrade image"; exit 1; }
+          [[ "${assets[0]}" == *"linksys_mx4200v1"* ]] || { echo "::error::unexpected sysupgrade image: ${assets[0]}"; exit 1; }
           grep 'sysupgrade.bin' "$out/sha256sums" >"sha256sums-${DEVICE}.txt"
           cp "$out/config.buildinfo" "config-${DEVICE}.buildinfo"
           # The ImageBuilder and the overlay files are what custom.yml builds
