@@ -1,137 +1,58 @@
-# Qualcommax NSS Builder
+# MX4200 v1 NSS OpenWrt Builder
 
-### Prebuilt OpenWrt firmware with Qualcomm NSS hardware offload for IPQ807x and IPQ60xx (IPQ6018) routers
+This fork builds **only Linksys MX4200 v1 (512 MiB RAM)** using
+[JuliusBairaktaris/openwrt-ppe-nss](https://github.com/JuliusBairaktaris/openwrt-ppe-nss)
+(`ppe-nss` branch). It retains NSS Wi-Fi offload and the existing
+PPE-based wired offload.
 
-[![Build](https://img.shields.io/github/actions/workflow/status/JuliusBairaktaris/Qualcommax_NSS_Builder/build.yml?branch=main&style=flat-square&logo=github&label=Build)](https://github.com/JuliusBairaktaris/Qualcommax_NSS_Builder/actions/workflows/build.yml)
-[![Lint](https://img.shields.io/github/actions/workflow/status/JuliusBairaktaris/Qualcommax_NSS_Builder/lint.yml?branch=main&style=flat-square&logo=github&label=Lint)](https://github.com/JuliusBairaktaris/Qualcommax_NSS_Builder/actions/workflows/lint.yml)
-[![License](https://img.shields.io/github/license/JuliusBairaktaris/Qualcommax_NSS_Builder?style=flat-square&label=License)](LICENSE)
-[![Last Commit](https://img.shields.io/github/last-commit/JuliusBairaktaris/Qualcommax_NSS_Builder?style=flat-square&label=Last%20Commit)](https://github.com/JuliusBairaktaris/Qualcommax_NSS_Builder/commits/main)
-[![Downloads](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FJuliusBairaktaris%2FQualcommax_NSS_Builder%2Fstats%2Fdownloads.json&style=flat-square)](https://github.com/JuliusBairaktaris/Qualcommax_NSS_Builder/releases)
+## What changed
 
-OpenWrt sysupgrade images with hardware offload for 41 IPQ807x and 24
-IPQ60xx boards of the `qualcommax` target, built by GitHub Actions from the
-`ppe-nss` branch of
-[openwrt-ppe-nss](https://github.com/JuliusBairaktaris/openwrt-ppe-nss).
+- **Single target:** `Build` uses only `ipq807x-6m-kernel`, and the
+  group config now selects only `linksys_mx4200v1`. Other inherited device
+  config files are inactive, not removed.
+- **Low-memory ath11k:** `DP_RXDMA_BUF_RING_SIZE` and
+  `DP_RXDMA_MONITOR_DESC_RING_SIZE` shrink from 4096 to 2048. The refill
+  buffer length and NSS offload paths remain unchanged.
+- **Detached BTF:** pins
+  [QiuSimons/vmlinux-btf](https://github.com/QiuSimons/vmlinux-btf)
+  to `b41770520cef00652738cdfbbdda44d4de77f3f5`, installs it as
+  `CONFIG_PACKAGE_vmlinux-btf=y`, and provides `pahole` via the Ubuntu
+  `dwarves` build dependency.
+- **6 MiB kernel partition:** keeps REGULAR stack protection.
+  `CONFIG_KERNEL_DEBUG_INFO_BTF` is **not enabled** to avoid enlarging the
+  compressed FIT kernel image.
 
-The wired traffic (routing, NAT, PPPoE, VLAN, bridging, multicast snooping
-and SQM) runs in the PPE, the packet engine in the SoC's switch, through
-OpenWrt's upstream `qca_edma`/`qca_ppe` drivers and the kernel's own
-offload interfaces. The Wi-Fi data path of the SoC radios runs on the NSS
-cores through `nss-wifi-drv`. There is no ECM, no NSS qdisc and no vendor
-NSS host driver. Only the NSS firmware comes from
-[nss-packages](https://github.com/JuliusBairaktaris/nss-packages).
+## Build
 
-How the offload works, how to check it and what is not covered is in the
-[openwrt-ppe-nss wiki](https://github.com/JuliusBairaktaris/openwrt-ppe-nss/wiki).
+Use [Actions → Build](https://github.com/nieaowei/Qualcommax_NSS_Builder/actions/workflows/build.yml)
+to run the workflow after merging into `main`. Scheduled builds only
+rebuild when upstream sources move. On success, the firmware is published
+under [Releases](https://github.com/nieaowei/Qualcommax_NSS_Builder/releases).
 
-## Install
+The workflow enforces exactly one `linksys_mx4200v1` sysupgrade image.
+Only flash `*linksys_mx4200v1*squashfs-sysupgrade.bin` over an existing
+MX4200 v1 OpenWrt installation. **Never use this image on MX4200 v2,
+MX5300, MX8500, or MX4300.** Confirm the compressed kernel fits the
+6 MiB partition before flashing.
 
-Find your router on **[ppenss.github.io](https://ppenss.github.io/)**. It
-links the sysupgrade image of each board, builds custom images with
-packages added or left out, lists the kernel modules of each release and
-explains updates. The images are also on the
-[releases](https://github.com/JuliusBairaktaris/Qualcommax_NSS_Builder/releases)
-page.
-
-There is no factory image. Install stock OpenWrt from its
-[device page](https://openwrt.org/toh/start) first, then flash the
-sysupgrade image in LuCI (System → Backup / Flash Firmware). After a fresh
-install, Wi-Fi is off and has no key.
-
-Images update themselves with `ppe-update` (System → Firmware update),
-keeping settings and added packages. Kernel modules install with
-`apk add kmod-<name>` from the release's own feed; the official OpenWrt
-kmods do not load. Coming from an `edma-nss` image, follow
-[Migrating from edma-nss](https://github.com/JuliusBairaktaris/openwrt-ppe-nss/wiki/Migrating-from-edma-nss).
-
-The Xiaomi AX3600 is the test board. The other boards are built but not
-tested by the maintainer, who has no IPQ60xx hardware. Reports are welcome
-in the [forum thread](https://forum.openwrt.org/t/qualcommax-nss-build/148529).
-
-## What ships
-
-| Area | Contents |
-|---|---|
-| Routing, NAT | PPE through the fw4 flowtable: IPv4/IPv6, NAT, PPPoE, 802.1Q VLAN |
-| Bridge, multicast | PPE through switchdev, with IGMP/MLD snooping; kernel multicast routing enabled |
-| SQM | PPE shaper through tc offload: `hw_ppe.qos` in `sqm-scripts`, `luci-app-sqm` |
-| QoS classes | `qca-ppe-qos`, `luci-app-qca-ppe-qos`, `dcb`, `tc`, `ethtool-full`, `devlink` |
-| Wi-Fi | `kmod-nss-wifi-drv`: the ath11k data path on the NSS cores, on by default |
-| Base | OpenSSH instead of Dropbear, OpenSSL, LuCI over HTTPS, BCP38, `htop`, `iperf3`, `curl` |
-| Kernel modules | USB storage, TUN and WireGuard built in; ramoops crash logs archived to `/root/pstore` |
-| Toolchain | GCC 15, Binutils 2.46, mold, LTO, PIE/SSP/FORTIFY_SOURCE=3/RELRO |
-
-First-boot defaults (applied once, kept across upgrades): WAN zone input
-set to DROP, BCP38 on `wan`, LuCI redirected to HTTPS, and the router
-serving NTP to the LAN (DHCP option 42).
-
-Routed multicast (IPTV) needs a daemon such as `igmpproxy`, which is not
-bundled: add it in the image picker, or see
-[docs/CUSTOMIZE.md](docs/CUSTOMIZE.md#routed-multicast).
-
-## Build it yourself
-
-Fork this repo and run the Build workflow, or build locally:
+## Verify on the router
 
 ```sh
-git clone --branch ppe-nss https://github.com/JuliusBairaktaris/openwrt-ppe-nss openwrt
-git clone https://github.com/JuliusBairaktaris/Qualcommax_NSS_Builder builder
-cd openwrt
-cp feeds.conf.default feeds.conf
-echo "src-git nss https://github.com/JuliusBairaktaris/nss-packages.git;ppe-nss" >> feeds.conf
-sed -i 's|^src-git luci .*|src-git luci https://github.com/JuliusBairaktaris/luci.git;luci-app-ppe-qos|' feeds.conf
-./scripts/feeds update -a && ./scripts/feeds install -a
-patch -d feeds/packages -p1 < ../builder/patches/feeds/ppe-nss/packages/0001-*.patch   # hw_ppe.qos
-cat ../builder/devices/common/config ../builder/devices/xiaomi_ax3600/config > .config   # or any devices/<group>
-make defconfig && make -j"$(nproc)"
+grep -E 'MemAvailable|Slab|SUnreclaim' /proc/meminfo
+ls -l /usr/lib/debug/boot/vmlinux*
+dmesg | grep -Ei 'ath11k|nss|oom|allocation'
 ```
 
-`scripts/prepare-build.sh` does all of the above in CI and also copies the
-overlay files from `devices/*/files*` into the image.
+The detached BTF package generates type data from headers/config, not the
+running kernel's full embedded BTF; `/sys/kernel/btf/vmlinux` may still
+be absent. Test compatibility with the exact eBPF CO-RE application you use.
 
-> [!IMPORTANT]
-> `ppe-nss` is rebased often, so `git pull` does not update it. Use:
->
-> ```sh
-> git fetch origin && git reset --hard origin/ppe-nss
-> ./scripts/feeds update -a && ./scripts/feeds install -a
-> make defconfig
-> ```
+The ppe-nss tree does not expose
+`CPTCFG_ATH11K_MEM_PROFILE_512M`. Consequently, the supplied
+conditional patch would be inactive there. The **2048-entry values
+are unconditional only within this single-device build**.
 
-[docs/CUSTOMIZE.md](docs/CUSTOMIZE.md) covers the build options and
-overlays. [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) describes the CI
-pipeline.
-
-## Contributing
-
-Issues and PRs are welcome, see [CONTRIBUTING.md](CONTRIBUTING.md). Bugs in
-the firmware itself belong in the
-[openwrt-ppe-nss issues](https://github.com/JuliusBairaktaris/openwrt-ppe-nss/issues);
-the wiki's [Reporting Bugs](https://github.com/JuliusBairaktaris/openwrt-ppe-nss/wiki/Reporting-Bugs)
-page lists what to include.
-
-## Acknowledgements
-
-- [Christian Marangi (Ansuel)](https://github.com/Ansuel) for the upstream
-  EDMA and PPE drivers.
-- [Robert Marko (robimarko)](https://github.com/robimarko) for maintaining the
-  OpenWrt qualcommax target.
-- [qosmio](https://github.com/qosmio) for NSS development, the
-  [openwrt-ipq](https://github.com/qosmio/openwrt-ipq) tree and the NSS
-  firmware packaging.
-- [rodriguezst](https://github.com/rodriguezst) for the original
-  [ipq807x-openwrt-builder](https://github.com/rodriguezst/ipq807x-openwrt-builder).
-- The OpenWrt community in the
-  [NSS build thread](https://forum.openwrt.org/t/qualcommax-nss-build/148529).
-
-## Support
-
-This is an unpaid single-maintainer project. Donations go toward IPQ60xx and
-IPQ50xx test hardware.
-
-- [GitHub Sponsors](https://github.com/sponsors/JuliusBairaktaris)
-- [PayPal](https://paypal.me/JuliusBairaktaris)
-
-## License
-
-[GPL-2.0](LICENSE), as OpenWrt.
+The old multi-device configuration directories and ancillary custom image
+and site workflows remain for reference; only the primary `Build`
+workflow is restricted to MX4200 v1. See [docs/CUSTOMIZE.md](docs/CUSTOMIZE.md)
+for other build details.
