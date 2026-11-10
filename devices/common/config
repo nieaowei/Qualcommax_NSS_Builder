@@ -72,6 +72,9 @@ CONFIG_PACKAGE_luci-ssl-openssl=y
 CONFIG_PACKAGE_luci-app-bcp38=y
 
 ## Additional Packages and Utilities
+# honk needs libstdc++. Bundle the toolchain-matched runtime into the image
+# so apk does not depend on official SNAPSHOT target feeds.
+CONFIG_PACKAGE_libstdcpp=y
 CONFIG_PACKAGE_curl=y
 CONFIG_PACKAGE_htop=y
 CONFIG_HTOP_LMSENSORS=n
