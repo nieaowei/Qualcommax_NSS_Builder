@@ -1,0 +1,40 @@
+{
+ "latest": "ppe-nss-20261110T224815Z-42917841945",
+ "releases": [
+  {
+   "tag": "ppe-nss-20261110T224815Z-42917841945",
+   "time": 1794355250,
+   "groups": [
+    "ipq807x-6m-kernel"
+   ]
+  },
+  {
+   "tag": "ppe-nss-20261110T162939Z-42855023726",
+   "time": 1794344644,
+   "groups": [
+    "ipq807x-6m-kernel"
+   ]
+  }
+ ],
+ "flavours": {
+  "ppe-nss": {
+   "latest": "ppe-nss-20261110T224815Z-42917841945",
+   "releases": [
+    {
+     "tag": "ppe-nss-20261110T224815Z-42917841945",
+     "time": 1794355250,
+     "groups": [
+      "ipq807x-6m-kernel"
+     ]
+    },
+    {
+     "tag": "ppe-nss-20261110T162939Z-42855023726",
+     "time": 1794344644,
+     "groups": [
+      "ipq807x-6m-kernel"
+     ]
+    }
+   ]
+  }
+ }
+}
